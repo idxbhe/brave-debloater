@@ -1,0 +1,3 @@
+// Brave DeBloater application icon resource.
+// Numeric ID 1 is loaded in main.nim via MAKEINTRESOURCE(1).
+1 ICON "bravedebloater.ico"

@@ -1,0 +1,16 @@
+# Nim / C build artifacts
+nimcache/
+bin/
+dist/
+src/main.exe
+*.o
+*.c
+*.pdb
+*.ilk
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,107 @@
+name: Version & Release
+
+# Two ways to release:
+#   1. Push a tag like v1.2.0  -> build + publish a GitHub Release for that tag.
+#   2. Run this workflow manually with a version (e.g. 1.2.0) -> it bumps the
+#      version in bravedebloater.nimble, commits, tags, pushes, then builds and
+#      publishes the release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version and tag
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          echo "Release version: $V"
+
+      - name: Bump version, commit and tag (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          sed -i -E "s/^version[[:space:]]*=.*/version = \"${{ steps.ver.outputs.version }}\"/" bravedebloater.nimble
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bravedebloater.nimble
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): v${{ steps.ver.outputs.version }}"
+          fi
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "${{ steps.ver.outputs.tag }}"
+
+      - name: Set up MinGW-w64
+        id: mingw
+        uses: egor-tensin/setup-mingw@v3
+        with:
+          platform: x64
+
+      - name: Set up Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.4.0'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: nimble install winim@4.0.0 -y
+
+      - name: Compile icon resource
+        shell: pwsh
+        run: |
+          ${{ steps.mingw.outputs.windres }} -i bravedebloater.rc -o bravedebloater.res --input-format=rc --output-format=coff
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          nim c -d:release --nimcache:dist/nimcache -o:dist/bravedebloater.exe src/main.nim
+
+      - name: Package release archive
+        shell: pwsh
+        run: |
+          Copy-Item README.md dist/
+          Compress-Archive -Path dist/bravedebloater.exe, dist/README.md -DestinationPath dist/bravedebloater-${{ steps.ver.outputs.version }}-windows-x64.zip
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Brave DeBloater v${{ steps.ver.outputs.version }}
+          body: |
+            Brave DeBloater v${{ steps.ver.outputs.version }}
+
+            Single-file Windows (x64) GUI app. No installation required:
+            extract the ZIP and run `bravedebloater.exe`
+            (run as administrator to write machine-wide HKLM policies).
+          files: |
+            dist/bravedebloater.exe
+            dist/bravedebloater-*-windows-x64.zip
+          generate_release_notes: true
