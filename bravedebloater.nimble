@@ -6,7 +6,6 @@ license = "MIT"
 
 srcDir = "src"
 binDir = "bin"
-namedBin = "bravedebloater"
 backend = "c"
 
 requires "nim >= 2.0.0"
