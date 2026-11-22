@@ -59,7 +59,6 @@ jobs:
           git push origin "${{ steps.ver.outputs.tag }}"
 
       - name: Set up MinGW-w64
-        id: mingw
         uses: egor-tensin/setup-mingw@v3
         with:
           platform: x64
@@ -76,7 +75,7 @@ jobs:
       - name: Compile icon resource
         shell: pwsh
         run: |
-          ${{ steps.mingw.outputs.windres }} -i bravedebloater.rc -o bravedebloater.res --input-format=rc --output-format=coff
+          windres -i bravedebloater.rc -o bravedebloater.res --input-format=rc --output-format=coff
 
       - name: Build executable
         shell: pwsh
